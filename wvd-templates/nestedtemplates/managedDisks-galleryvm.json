@@ -2,6 +2,13 @@
     "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
     "contentVersion": "1.0.0.0",
     "parameters": {
+        "artifactsLocation": {
+            "type": "string",
+            "metadata": {
+                "description": "The base URI where artifacts required by this template are located."
+            },
+            "defaultValue": "https://wvdportalstorageblob.blob.core.windows.net/galleryartifacts/Configuration.zip"
+        },
         "VmImageVhdUri": {
             "type": "string",
             "metadata": {
@@ -14,26 +21,26 @@
                 "description": "The storage account containing the custom VHD."
             }
         },
-        "rdshGalleryImageSKU": {
+        "vmGalleryImageOffer": {
             "type": "string",
-            "allowedValues": [
-                "Windows-10-Enterprise-multi-session-with-Office-365-ProPlus",
-                "Windows-10-Enterprise-multi-session-with-Office-365-ProPlus-2004",
-                "Windows-10-Enterprise-multi-session-with-Office-365-ProPlus-1909",
-                "Windows-10-Enterprise-multi-session-with-Office-365-ProPlus-1903",
-                "Windows-10-Enterprise-multi-session",
-                "Windows-10-Enterprise-multi-session-2004",
-                "Windows-10-Enterprise-multi-session-1909",
-                "Windows-10-Enterprise-multi-session-1903",
-                "Windows-10-Enterprise-Latest",
-                "Windows-10-Enterprise-2004",
-                "Windows-10-Enterprise-1909",
-                "Windows-10-Enterprise-1903",
-                "2016-Datacenter"
-            ],
             "metadata": {
-                "description": "Gallery image SKU."
-            }
+                "description": "(Required when vmImageType = Gallery) Gallery image Offer."
+            },
+            "defaultValue": ""
+        },
+        "vmGalleryImagePublisher": {
+            "type": "string",
+            "metadata": {
+                "description": "(Required when vmImageType = Gallery) Gallery image Publisher."
+            },
+            "defaultValue": ""
+        },
+        "vmGalleryImageSKU": {
+            "type": "string",
+            "metadata": {
+                "description": "(Required when vmImageType = Gallery) Gallery image SKU."
+            },
+            "defaultValue": ""
         },
         "rdshPrefix": {
             "type": "string",
@@ -50,15 +57,10 @@
         },
         "rdshVMDiskType": {
             "type": "string",
-            "allowedValues": [
-                "Premium_LRS",
-                "StandardSSD_LRS",
-                "Standard_LRS"
-            ],
+            "allowedValues": ["Premium_LRS", "StandardSSD_LRS", "Standard_LRS"],
             "metadata": {
-                "description": "The VM disk type for the VM: Premium_LRS (Default), Standard_LRS or StandardSSD_LRS."
-            },
-            "defaultValue": "Premium_LRS"
+                "description": "The VM disk type for the VM: HDD or SSD."
+            }
         },
         "rdshVmSize": {
             "type": "string",
@@ -74,13 +76,13 @@
             },
             "defaultValue": false
         },
-        "existingDomainusername": {
+        "administratorAccountUsername": {
             "type": "string",
             "metadata": {
                 "description": "The username for the admin."
             }
         },
-        "existingDomainPassword": {
+        "administratorAccountPassword": {
             "type": "securestring",
             "metadata": {
                 "description": "The password that corresponds to the existing domain username."
@@ -98,110 +100,194 @@
                 "description": "The unique id of the subnet for the nics."
             }
         },
-        "rdshImageSourceResourceGroup": {
+        "rdshImageSourceId": {
             "type": "string",
             "defaultValue": "",
             "metadata": {
-                "description": "Resource group name for the managed disk, if you choose to provide one."
-            }
-        },
-        "rdshImageSourceName": {
-            "type": "string",
-            "defaultValue": "",
-            "metadata": {
-                "description": "Name of the managed disk."
+                "description": "Resource ID of the image."
             }
         },
         "location": {
             "type": "string",
+            "defaultValue": "",
             "metadata": {
                 "description": "Location for all resources to be created in."
             }
         },
-        "enablePersistentDesktop": {
+        "usePublicIP":{
             "type": "bool",
             "metadata": {
-                "description": "Set this parameter to true if you would like to enable Persistent Desktop experience. Defaults to false. Note: Do not use this, it is here for backwards compatibility and may be removed soon."
+                "description": "Whether to use a Public IP"
             },
             "defaultValue": false
+        },
+        "publicIpAddressType": {
+            "type": "string",
+            "metadata": {
+                "description": "The address type of the Public IP"
+            },
+            "allowedValues": ["Dynamic", "Static"],
+            "defaultValue": "Dynamic"
+        },
+        "publicIpAddressSku": {
+            "type": "string",
+            "metadata": {
+                "description": "The sku name of the Public IP"
+            },
+            "allowedValues": ["Basic", "Standard"],
+            "defaultValue": "Basic"
+        },
+        "createNetworkSecurityGroup":{
+            "type": "bool",
+            "metadata":{
+                "description": "Whether to create a new network security group or use an existing one"
+            },
+            "defaultValue": false
+        },
+        "networkSecurityGroupId": {
+            "type": "string",
+            "metadata": {
+                "description": "The resource id of an existing network security group"
+            },
+            "defaultValue": ""
+        },
+        "networkSecurityGroupRules": {
+            "type": "array",
+            "metadata": {
+                "description": "The rules to be given to the new network security group"
+            },
+            "defaultValue": {}
+        },
+        "networkInterfaceTags": {
+            "type": "object",
+            "metadata": {
+                "description": "The tags to be assigned to the network interfaces"
+            },
+            "defaultValue": {}
+        },
+        "networkSecurityGroupTags": {
+            "type": "object",
+            "metadata": {
+                "description": "The tags to be assigned to the network security groups"
+            },
+            "defaultValue": {}
+        },
+        "publicIPAddressTags": {
+            "type": "object",
+            "metadata": {
+                "description": "The tags to be assigned to the public ip addresses"
+            },
+            "defaultValue": {}
+        },
+        "virtualMachineTags": {
+            "type": "object",
+            "metadata": {
+                "description": "The tags to be assigned to the virtual machines"
+            },
+            "defaultValue": {}
+        },
+        "imageTags": {
+            "type": "object",
+            "metadata": {
+                "description": "The tags to be assigned to the images"
+            },
+            "defaultValue": {}
+        },
+        "vmInitialNumber": {
+            "type": "int",
+            "metadata": {
+                "description": "VM name prefix initial number."
+            },
+            "defaultValue": 0
+        },
+        "_guidValue": {
+            "type": "string",
+            "defaultValue": "[newGuid()]"
+        },        
+        "hostpoolToken": {
+            "type": "string",
+            "metadata": {
+                "description": "The token for adding VMs to the hostpool"
+            }
+        },
+        "hostpoolName":{
+            "type": "string",
+            "metadata": {
+                "description": "The name of the hostpool"
+            }
+        },
+        "ouPath": {
+            "type":"string",
+            "metadata": {
+                "description": "OUPath for the domain join"
+            },
+            "defaultValue": ""
+        },
+        "domain": {
+            "type": "string",
+            "metadata": {
+                "description": "Domain to join"
+            },
+            "defaultValue": ""
         }
     },
     "variables": {
-        "galleryImage": {
-            "Windows-10-Enterprise-multi-session-with-Office-365-ProPlus": {
-                "galleryPublisher": "MicrosoftWindowsDesktop",
-                "galleryOffer": "office-365",
-                "gallerySku": "20h1-evd-o365pp"
-            },
-            "Windows-10-Enterprise-multi-session-with-Office-365-ProPlus-2004": {
-                "galleryPublisher": "MicrosoftWindowsDesktop",
-                "galleryOffer": "office-365",
-                "gallerySku": "20h1-evd-o365pp"
-            },
-            "Windows-10-Enterprise-multi-session-with-Office-365-ProPlus-1909": {
-                "galleryPublisher": "MicrosoftWindowsDesktop",
-                "galleryOffer": "office-365",
-                "gallerySku": "19h2-evd-o365pp"
-            },
-             "Windows-10-Enterprise-multi-session-with-Office-365-ProPlus-1903": {
-                "galleryPublisher": "MicrosoftWindowsDesktop",
-                "galleryOffer": "office-365",
-                "gallerySku": "1903-evd-o365pp"
-            },
-            "Windows-10-Enterprise-multi-session": {
-                "galleryPublisher": "MicrosoftWindowsDesktop",
-                "galleryOffer": "Windows-10",
-                "gallerySku": "20h1-evd"
-            },
-            "Windows-10-Enterprise-multi-session-2004": {
-                "galleryPublisher": "MicrosoftWindowsDesktop",
-                "galleryOffer": "Windows-10",
-                "gallerySku": "20h1-evd"
-            },
-            "Windows-10-Enterprise-multi-session-1909": {
-                "galleryPublisher": "MicrosoftWindowsDesktop",
-                "galleryOffer": "Windows-10",
-                "gallerySku": "19h2-evd"
-            },
-            "Windows-10-Enterprise-multi-session-1903": {
-                "galleryPublisher": "MicrosoftWindowsDesktop",
-                "galleryOffer": "Windows-10",
-                "gallerySku": "19h1-evd"
-            },
-            "Windows-10-Enterprise-Latest": {
-                "galleryPublisher": "MicrosoftWindowsDesktop",
-                "galleryOffer": "Windows-10",
-                "gallerySku": "20h1-ent"
-            },
-            "Windows-10-Enterprise-2004": {
-                "galleryPublisher": "MicrosoftWindowsDesktop",
-                "galleryOffer": "Windows-10",
-                "gallerySku":  "20h1-ent"
-            },
-            "Windows-10-Enterprise-1909": {
-                "galleryPublisher": "MicrosoftWindowsDesktop",
-                "galleryOffer": "Windows-10",
-                "gallerySku": "19h2-ent"
-            },
-            "Windows-10-Enterprise-1903": {
-                "galleryPublisher": "MicrosoftWindowsDesktop",
-                "galleryOffer": "Windows-10",
-                "gallerySku": "19h1-ent"
-            },
-            "2016-Datacenter": {
-                "galleryPublisher": "MicrosoftwindowsServer",
-                "galleryOffer": "WindowsServer",
-                "gallerySku": "2016-Datacenter"
-            }
-        },
-        "storageAccountType": "[parameters('rdshVMDiskType')]"
+        "existingDomainUsername": "[first(split(parameters('administratorAccountUsername'), '@'))]",
+        "domain": "[if(equals(parameters('domain'), ''), last(split(parameters('administratorAccountUsername'), '@')), parameters('domain'))]",
+        "storageAccountType": "[parameters('rdshVMDiskType')]",        
+        "newNsgName": "[concat(parameters('rdshPrefix'), 'nsg-', parameters('_guidValue'))]",
+        "nsgId": "[if(parameters('createNetworkSecurityGroup'), resourceId('Microsoft.Network/networkSecurityGroups', variables('newNsgName')), parameters('networkSecurityGroupId'))]"
     },
     "resources": [
         {
+            "apiVersion": "2018-05-01",
+            "name": "NSG-linkedTemplate",
+            "type": "Microsoft.Resources/deployments",
+            "properties": {
+                "mode": "Incremental",
+                "template":{
+                    "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+                    "contentVersion": "1.0.0.0",
+                    "resources": [
+                        {
+                            "condition": "[parameters('createNetworkSecurityGroup')]",
+                            "type": "Microsoft.Network/networkSecurityGroups",
+                            "apiVersion": "2019-02-01",
+                            "name": "[variables('newNsgName')]",
+                            "location": "[parameters('location')]",
+                            "tags": "[parameters('networkSecurityGroupTags')]",
+                            "properties": {
+                                "securityRules": "[parameters('networkSecurityGroupRules')]"
+                            }
+                        }
+                    ]
+                }
+            }
+        },
+        {
+            "copy": {
+                "name": "rdsh-pip-loop",
+                "count": "[parameters('rdshNumberOfInstances')]"
+            },
+            "condition": "[parameters('usePublicIP')]",
+            "type": "Microsoft.Network/publicIpAddresses",
+            "apiVersion": "2019-02-01",
+            "name": "[concat(parameters('rdshPrefix'), add(copyindex(), parameters('vmInitialNumber')), '-ip')]",
+            "location": "[parameters('location')]",
+            "tags": "[parameters('publicIPAddressTags')]",
+            "sku": {
+                "name": "[parameters('publicIpAddressSku')]"
+            },
+            "properties": {
+                "publicIpAllocationMethod": "[parameters('publicIpAddressType')]"
+            }
+        },
+        {
             "apiVersion": "2018-11-01",
             "type": "Microsoft.Network/networkInterfaces",
-            "name": "[concat(parameters('rdshPrefix'), copyindex(), '-nic')]",
+            "name": "[concat(parameters('rdshPrefix'), add(copyindex(), parameters('vmInitialNumber')), '-nic')]",
             "location": "[parameters('location')]",
+            "tags": "[parameters('networkInterfaceTags')]",
             "copy": {
                 "name": "rdsh-nic-loop",
                 "count": "[parameters('rdshNumberOfInstances')]"
@@ -214,39 +300,46 @@
                             "privateIPAllocationMethod": "Dynamic",
                             "subnet": {
                                 "id": "[parameters('subnet-id')]"
-                            }
+                            },
+                            "publicIpAddress": "[if(parameters('usePublicIP'), json(concat('{\"id\": \"', resourceId('Microsoft.Network/publicIpAddresses', concat(parameters('rdshPrefix'), add(copyindex(), parameters('vmInitialNumber')), '-ip')), '\"}')), json('null'))]"
                         }
                     }
                 ],
-                "enableAcceleratedNetworking": "[parameters('enableAcceleratedNetworking')]"
-            }
+                "enableAcceleratedNetworking": "[parameters('enableAcceleratedNetworking')]",
+                "networkSecurityGroup":"[if(empty(parameters('networkSecurityGroupId')), json('null'), json(concat('{\"id\": \"', variables('nsgId'), '\"}')))]"                     
+            },
+            "dependsOn": [
+                "NSG-linkedTemplate",
+                "rdsh-pip-loop"
+            ]
         },
         {
             "apiVersion": "2018-10-01",
             "type": "Microsoft.Compute/virtualMachines",
-            "name": "[concat(parameters('rdshPrefix'), copyindex())]",
+            "name": "[concat(parameters('rdshPrefix'), add(copyindex(), parameters('vmInitialNumber')))]",
             "location": "[parameters('location')]",
+            "tags": "[parameters('virtualMachineTags')]",
             "copy": {
                 "name": "rdsh-vm-loop",
                 "count": "[parameters('rdshNumberOfInstances')]"
             },
             "dependsOn": [
-                "[concat('Microsoft.Network/networkInterfaces/', parameters('rdshPrefix'), copyindex(), '-nic')]"
+                "[concat('Microsoft.Network/networkInterfaces/', parameters('rdshPrefix'), add(copyindex(), parameters('vmInitialNumber')), '-nic')]"
             ],
             "properties": {
                 "hardwareProfile": {
                     "vmSize": "[parameters('rdshVmSize')]"
-                },              
+                },
                 "osProfile": {
-                    "computerName": "[concat(parameters('rdshPrefix'), copyindex())]",
-                    "adminUsername": "[parameters('existingDomainUsername')]",
-                    "adminPassword": "[parameters('existingDomainPassword')]"
+                    "computerName": "[concat(parameters('rdshPrefix'), add(copyindex(), parameters('vmInitialNumber')))]",
+                    "adminUsername": "[variables('existingDomainUsername')]",
+                    "adminPassword": "[parameters('administratorAccountPassword')]"
                 },
                 "storageProfile": {
                     "imageReference": {
-                        "publisher": "[variables('galleryimage')[parameters('rdshGalleryImageSKU')].galleryPublisher]",
-                        "offer": "[variables('galleryImage')[parameters('rdshGalleryImageSKU')].galleryOffer]",
-                        "sku": "[variables('galleryImage')[parameters('rdshGalleryImageSKU')].gallerySku]",
+                        "publisher": "[parameters('vmGalleryImagePublisher')]",
+                        "offer": "[parameters('vmGalleryImageOffer')]",
+                        "sku": "[parameters('vmGalleryImageSKU')]",
                         "version": "latest"
                     },
                     "osDisk": {
@@ -259,7 +352,7 @@
                 "networkProfile": {
                     "networkInterfaces": [
                         {
-                            "id": "[resourceId('Microsoft.Network/networkInterfaces',concat(parameters('rdshPrefix'), copyindex(), '-nic'))]"
+                            "id": "[resourceId('Microsoft.Network/networkInterfaces',concat(parameters('rdshPrefix'), add(copyindex(), parameters('vmInitialNumber')), '-nic'))]"
                         }
                     ]
                 },
@@ -269,6 +362,58 @@
                     }
                 },
                 "licenseType": "Windows_Client"
+            }
+        },
+        {
+            "apiVersion": "2018-10-01",
+            "type": "Microsoft.Compute/virtualMachines/extensions",
+            "name": "[concat(parameters('rdshPrefix'), add(copyindex(), parameters('vmInitialNumber')), '/', 'joindomain')]",
+            "location": "[parameters('location')]",
+            "dependsOn": ["rdsh-vm-loop"],
+            "copy": {
+                "name": "rdsh-domain-join-loop",
+                "count": "[parameters('rdshNumberOfInstances')]"
+            },
+            "properties": {
+                "publisher": "Microsoft.Compute",
+                "type": "JsonADDomainExtension",
+                "typeHandlerVersion": "1.3",
+                "autoUpgradeMinorVersion": true,
+                "settings": {
+                    "name": "[variables('domain')]",
+                    "ouPath": "[parameters('ouPath')]",
+                    "user": "[parameters('administratorAccountUsername')]",
+                    "restart": "true",
+                    "options": "3"
+                },
+                "protectedSettings": {
+                    "password": "[parameters('administratorAccountPassword')]"
+                }
+            }
+        },
+        {
+            "apiVersion": "2018-10-01",
+            "type": "Microsoft.Compute/virtualMachines/extensions",
+            "name": "[concat(parameters('rdshPrefix'), add(copyindex(), parameters('vmInitialNumber')), '/', 'dscextension')]",
+            "location": "[parameters('location')]",
+            "dependsOn": ["rdsh-domain-join-loop"],
+            "copy": {
+                "name": "rdsh-dsc-loop",
+                "count": "[parameters('rdshNumberOfInstances')]"
+            },
+            "properties": {
+                "publisher": "Microsoft.Powershell",
+                "type": "DSC",
+                "typeHandlerVersion": "2.73",
+                "autoUpgradeMinorVersion": true,
+                "settings": {
+                    "modulesUrl": "[parameters('artifactsLocation')]",
+                    "configurationFunction": "Configuration.ps1\\AddSessionHost",
+                    "properties": {
+                        "hostPoolName": "[parameters('hostpoolName')]",
+                        "registrationInfoToken": "[parameters('hostpoolToken')]"
+                    }
+                }
             }
         }
     ],
