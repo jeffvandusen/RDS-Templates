@@ -21,27 +21,6 @@
                 "description": "The storage account containing the custom VHD."
             }
         },
-        "vmGalleryImageOffer": {
-            "type": "string",
-            "metadata": {
-                "description": "(Required when vmImageType = Gallery) Gallery image Offer."
-            },
-            "defaultValue": ""
-        },
-        "vmGalleryImagePublisher": {
-            "type": "string",
-            "metadata": {
-                "description": "(Required when vmImageType = Gallery) Gallery image Publisher."
-            },
-            "defaultValue": ""
-        },
-        "vmGalleryImageSKU": {
-            "type": "string",
-            "metadata": {
-                "description": "(Required when vmImageType = Gallery) Gallery image SKU."
-            },
-            "defaultValue": ""
-        },
         "rdshPrefix": {
             "type": "string",
             "metadata": {
@@ -337,7 +316,7 @@
                 },
                 "storageProfile": {
                     "imageReference": {
-                          "id": "[variables('rdshImageSourceId')]"
+                          "id": "[parameters('rdshImageSourceId')]"
                     },
                     "osDisk": {
                         "createOption": "FromImage",
