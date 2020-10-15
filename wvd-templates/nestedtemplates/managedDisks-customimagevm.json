@@ -337,10 +337,7 @@
                 },
                 "storageProfile": {
                     "imageReference": {
-                        "publisher": "[parameters('vmGalleryImagePublisher')]",
-                        "offer": "[parameters('vmGalleryImageOffer')]",
-                        "sku": "[parameters('vmGalleryImageSKU')]",
-                        "version": "latest"
+                          "id": "[variables('rdshImageSourceId')]"
                     },
                     "osDisk": {
                         "createOption": "FromImage",
